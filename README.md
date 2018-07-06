@@ -5,16 +5,16 @@ This repository provides code for the analyses used in the manuscript: Predictin
 ## Preprocessing
 The main functions for preprocessing the data and computing features are: 
 
-`preprocessROIdata_v1.m`: formats the time course for further analysis and calls `preparedatastruct2.m`
-`compute_features.m`: computes and saves machine learning features 
+`preprocessROIdata_v1.m`: formats the time course for further analysis and calls `preparedatastruct2.m`    
+`compute_features.m`: computes and saves machine learning features     
 
 
 ## Analysis 
 
 The main functions for running the analyses are: 
 
-`runclassifier_fully_parallelized.m`: runs the logistic regression analyses
-`runclassifier_1NN.m`: runs the single nearest neighbor analyses
+`runclassifier_fully_parallelized.m`: runs the logistic regression analyses    
+`runclassifier_1NN.m`: runs the single nearest neighbor analyses    
 
 These functions are called by `run_classifiers_in_parallel.m`
 
@@ -22,12 +22,12 @@ These functions are called by `run_classifiers_in_parallel.m`
 
 The main functions for result aggregation are: 
 
-`finn_et_al_analysis.m`: performs the analyses in Finn et al. 2015
-`finn_plot_all_accuracies.m`: produces bar plots comparing accuracies for each preprocessing variation 
-`plot_1NN_heatmaps.m`: plots the Finn et al. 2015 heatmap comparison 
-`plot_FV_heatmap.m`: visualizes the raw BOLD variability features 
-`print_result_table_regularization_optimized`: prints out the logistic regression accuracies
-`plot_accuracies_all_datasets.m`: plots the logistic regression accuracies for each preprocessing variation 
+`finn_et_al_analysis.m`: performs the analyses in Finn et al. 2015    
+`finn_plot_all_accuracies.m`: produces bar plots comparing accuracies for each preprocessing variation     
+`plot_1NN_heatmaps.m`: plots the Finn et al. 2015 heatmap comparison     
+`plot_FV_heatmap.m`: visualizes the raw BOLD variability features     
+`print_result_table_regularization_optimized`: prints out the logistic regression accuracies    
+`plot_accuracies_all_datasets.m`: plots the logistic regression accuracies for each preprocessing variation      
 
 
 
