@@ -1,0 +1,79 @@
+% This function is for re-formatting our data so that it can be more easily
+% used by researchers accessing the open science foundation data dump 
+
+% The formatting issues changed are: 
+
+% 1) We have session 2 subjects that we throw out included in the data, but
+%    the session 1 subjects that we throw out are already thrown out. I think 
+%    we should only include the data that we use in the data dump. 
+% 2) The subject names (subjs) don't match, in this case a repeated subject 
+%    will have a different id. this is why we need to use the original 250 
+%    subjects index. I think it would be better to just use the original 
+%    250 subject names and then we won't have to use this index. 
+% 3) We don't include a session index. I'd like to add one. 
+
+
+data_directory = fullfile(getenv('HOME'),'Dropbox','FMRI','restingstatedata' ); 
+save_directory = fullfile(getenv('HOME'),'Dropbox','FMRI','restingstatedata', 'OSF_data_dump'); 
+
+
+filenames = { ... 
+    'tc_ica_wm_csf_out_180429.mat',... % 22
+    'tc_gm_out_180430.mat',... % 23
+    'tc_ica_gm_out_180521.mat',...  % 26
+    'tc_ica_gm_task_out_180523.mat' % 27
+    }; 
+NF = length(filenames); 
+load( fullfile(getenv('HOME'),'Dropbox','FMRI','restingstatedata','tc_csf_wm_motion_out_globalMask5000_203subj'), 'subj_ind_in_250' );
+
+
+%% Find which session 1 subjects correspond to session 2 subjects 
+
+% original ids 
+session1_subjs = subj_ind_in_250( 1:174); 
+session2_subjs = subj_ind_in_250( 175:end); 
+
+% storage for session 2 indices into session 1 
+session2_session1_matches = zeros( size(session2_subjs) ); 
+
+for i = 1:length(session2_subjs)
+    s = session2_subjs(i);
+    
+    % this gives the index of the match into the session1_ subjs
+    match_idx = find( s == session1_subjs);
+    if isempty(match_idx)
+        session2_session1_matches(i) = -1; 
+    else
+        session2_session1_matches(i) = match_idx;
+    end
+end
+
+% index for data to keep 
+to_keep = [ true(1,174) session2_session1_matches ~= -1]; 
+
+% create new subject list 
+load( fullfile( data_directory, 'tc_ica_wm_csf_out_180429.mat'), 'subjs'); 
+session2_session1_matches( session2_session1_matches == -1) = []; 
+new_subjs = [ subjs(1:174), subjs(session2_session1_matches)]; 
+
+%% Format each dataset 
+
+
+for f = 1:NF
+    filenow = filenames{f}; 
+    load( fullfile( data_directory, filenow ) ); 
+    
+%     subjs: {1×203 cell}
+%     tasks: {1×9 cell}
+%     readme: 'The version closest to MMP + recommended  ...'
+%     tc: {203×9 cell}
+    
+    session_idx = [ones(1,174) 2*ones(1, 203-174)]; 
+    
+    
+    
+end
+
+
+
+
