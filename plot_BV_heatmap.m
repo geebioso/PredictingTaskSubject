@@ -1,15 +1,16 @@
 %% Script to plot a matrix of standard deviation in BOLD activation
+function [] = plot_BV_heatmap (whs, truncate, roi_sort_by, fontsize, labels_on, ...
+    normalize, grid_on, remove_max) 
 
-addpath(fullfile('..','FMRI','BrainVisualization','Network Classification'));
-whs = 8;     % which data set? 8 is the most recent with edge voxels removed
-remove_outlier = 0; % Remove outlying variance from session2 data
-roi_sort_by = 'Lobe'; % 'Lobe'; % 'Lobe' or 'Hemishpere'
+%% INPUT: 
+%     str roi_sort_by: how to sort rois {'Lobe' or 'Hemishpere'}
+%     int fontsize
+%     bool labels_on: should we have individual row labels
+%     int normalize: how should we normalize? % 0 is no normalization, 1 is by subject, 2 is by ROI, 3 is globally
+%     bool grid_on = 1; % do we want to plot a grid on figures? 
+%     bool remove_max = 0; % do we want to remove the max variance value? 
 
-
-fontsize = 20;
-labels_on = 0;
-normalize = 0; % 0 is no normalization, 1 is by subject, 2 is by ROI, 3 is globally
-grid_on = 1;
+if whs==0; bad_roi=253; else; bad_roi=[]; end % ROI with low outlying variance (near 0)
 
 if normalize
     cmin = -4;
@@ -28,12 +29,6 @@ plot_ordered = 1;
 plot_sanity_check = 0;
 K = 9; 
 
-
-if (whs==8)
-    roifile    = ['ICAresults' filesep 'tc_csf_wm_motion_out_globalMask5000_203subj_conv'];
-    icfile     = '';
-end
-
 dorepresents      = [ 1 ];
 
 % whrep==1: ROI StdDev
@@ -42,96 +37,68 @@ dorepresents      = [ 1 ];
 
 featurelabels = { ...
     'StdDev ROIs' , ...
-    'Means  ROIs'
+    'Means  ROIs' , ...
+    'ROI FV scaled',...
+    'ROI FV',...
+    'MSSD', ...
+    'SQRT_MSS', ...
+    'Corrs  ROIs' , ...
+    'Covs   ROIS', ...
+    'Covs+Vars ROIs', ...
+    'Covs   ROIS scaled'
     };
 
 %% Load the task names
+[wd, rd] = set_directories(isHPC); % working directory and results directory
+
 if ~exist( 'tasks' , 'var' )
-    load( fullfile('ICAresults','tasklist') );
+    load( fullfile(rd, 'ICAresults','tasklist') );
 end
 
 task_labels = {'Emotional Pictures', 'Emotional Faces', ...
     'Encoding', 'Go/No-go', 'Rest', 'Retrieval', 'Monetary Incentive', 'Working Memory', 'Theory of Mind'}; 
 
-%% Load the original ROI timecourse data
-if ~exist( 'D' , 'var' )
-    load( roifile );
+%% Load Data 
+try
+    filenm = fullfile( rd, 'features', sprintf('whs%d_truncate%d.mat', whs, truncate));
+    fprintf('Loading %s\n', filenm);
+    load( filenm );  
+%                     NT: 9
+%                     NR: 269
+%                  combs: [1827×3 double]
+%                     NC: 1827
+%     subsinbothsessions: [19×1 double]
+%               features: [1×1 struct]
+
+% combs columns are [subject, task, session] 
+catch
+    error('Features are not computed for dataset %d', whs);
 end
 
-%% Constants
-NS = max( D.SubjectIndex2 ); % number of subjects
+% compute extra features
+roi_vars_scale = features.stds.^2;
+features.vars_scale = (roi_vars_scale - mean(roi_vars_scale(:)))/std(roi_vars_scale(:));
+features.covs_scale = (features.covs - mean(features.covs(:)))/(std(features.covs(:)));
 
-NT = length( tasks ); % number of tasks
-NR = size( D.ROI , 2 ); % number of regions
-%% Get combinations of Task x Subject x Session
-[ combs , ~ , cindex ] = unique( [ D.SubjectIndex2 D.TaskIndex D.SessionIndex ], 'rows' );
-NC = size( combs , 1 );
-
-% Find subjects that are in session 1 and session 2
+% compute number of subjects in both sessions 
+unique_subs = unique(combs(:,1));
+NS = length(unique_subs); 
 nspersubj = accumarray( combs(:,1) , combs(:,3) , [ NS 1 ] , @mean );
 subsinbothsessions = find( nspersubj == 1.5 );
 NSboth = length(subsinbothsessions);
-%% Calculate Correlations for ROI across Task x Subject x Session
-%if ~exist( 'roi_corrs' , 'var' )
-ROI = D.ROI;
 
-if ~exist( 'roi_means' , 'var' )
-    % Cap the FFT at 120
-    L = 120;
-    L2 = L/2 + 1;
-    
-    NRP = NR * (NR-1) / 2; % off diagonal entries of FC matrix
-    roi_covs  = zeros( NC , NRP );
-    roi_corrs = zeros( NC , NRP );
-    roi_means = zeros( NC , NR  );
-    roi_stds  = zeros( NC , NR  );
-    roi_fft   = zeros( NC , L2 * NR );
-    
-    warning off;
-    triidx = ~triu(true(NR));
-    for j=1:NC
-        if mod(j,100) == 0
-            fprintf( 'Working on combination %d of %d\n' , j , NC );
-        end
-        wh = find( cindex == j );
-        ROI_NOW = ROI( wh , : );
-        
-        roi_means( j , : ) = mean( ROI_NOW , 1 );
-        roi_stds( j , : )   = std( ROI_NOW , [] , 1 );
-        rhos  = 1 - pdist( ROI_NOW' , 'correlation' );
-        rhos2 = cov(ROI_NOW);
-        rhos2 = rhos2(triidx)';
-        roi_corrs( j , : ) = rhos;
-        roi_covs( j, : ) = rhos2;
-        
-        
-        yfft = fft( ROI_NOW( 1:L , : ) ,[],1)';
-        P2 = abs( yfft/L );
-        P1 = P2(:,1:L/2+1);
-        P1(:,2:end-1) = 2*P1(:,2:end-1);
-        %roi_fft( j , : ) = mean( P1 , 1 );
-        roi_fft( j , : ) = P1(:);
-        
-    end
-    warning on;
-    
-    % Remove NaNs
-    roi_corrs( isnan( roi_corrs )) = 0;
-    roi_covs( isnan( roi_covs )) = 0;
-    
-    roi_stds_old = roi_stds;
-    roi_means_old = roi_means;
-    
-    save( 'Results/roi_stds.mat', 'roi_stds'); 
-end
+% remove bad_roi 
+features.stds(:,bad_roi) = []; 
 
-if min(roi_stds(:)) > 0
-    fprintf('No Rois have variance of 0\nmin(roi_stds(:))=%2.2f', min(roi_stds(:)));
+%% Normalization 
+if min(features.stds(:)) > 0
+    fprintf('No Rois have variance of 0\nmin(features.stds(:))=%2.2f', min(features.stds(:)));
 end
 
 if normalize
-    unique_subs = unique(combs(:,1));
     session1_idx = ismember(combs(:,3),1);
+    
+    
     if normalize == 1
         
         for i = 1:NS
@@ -140,19 +107,19 @@ if normalize
             
             % session 1
             idx = and(sub_idx, session1_idx);
-            roi_stds(idx,:) = bsxfun( @minus, roi_stds_old(idx,:),mean(roi_stds_old(idx,:)));
-            roi_stds(idx,:) = bsxfun( @rdivide, roi_stds(idx,:), std(roi_stds_old(idx,:)));
+            features.stds_norm(idx,:) = bsxfun( @minus, features.stds(idx,:),mean(features.stds(idx,:)));
+            features.stds_norm(idx,:) = bsxfun( @rdivide, features.stds_norm(idx,:), std(features.stds(idx,:)));
             
-            roi_means(idx,:) = bsxfun( @minus, roi_means_old(idx,:),mean(roi_means_old(idx,:)));
-            roi_means(idx,:) = bsxfun( @rdivide, roi_means(idx,:), std(roi_means_old(idx,:)));
+            features.means_norm(idx,:) = bsxfun( @minus, features.means(idx,:),mean(features.means(idx,:)));
+            features.means_norm(idx,:) = bsxfun( @rdivide, features.means_norm(idx,:), std(features.means(idx,:)));
             
             % session 2
             idx = and(sub_idx, ~session1_idx);
-            roi_stds(idx,:) = bsxfun( @minus, roi_stds_old(idx,:),mean(roi_stds_old(idx,:)));
-            roi_stds(idx,:) = bsxfun( @rdivide, roi_stds(idx,:), std(roi_stds_old(idx,:)));
+            features.stds_norm(idx,:) = bsxfun( @minus, features.stds(idx,:),mean(features.stds(idx,:)));
+            features.stds_norm(idx,:) = bsxfun( @rdivide, features.stds_norm(idx,:), std(features.stds(idx,:)));
             
-            roi_means(idx,:) = bsxfun( @minus, roi_means_old(idx,:),mean(roi_means_old(idx,:)));
-            roi_means(idx,:) = bsxfun( @rdivide, roi_means(idx,:), std(roi_means_old(idx,:)));
+            features.means_norm(idx,:) = bsxfun( @minus, features.means(idx,:),mean(features.means(idx,:)));
+            features.means_norm(idx,:) = bsxfun( @rdivide, features.means_norm(idx,:), std(features.means(idx,:)));
             
             
         end
@@ -160,48 +127,45 @@ if normalize
         for r = 1:NR
             % sessoin 1 
             idx = session1_idx;
-            roi_stds(idx, r) = bsxfun( @minus, roi_stds_old(idx, r),mean(roi_stds_old(idx, r)));
-            roi_stds(idx, r) = bsxfun( @rdivide, roi_stds(idx, r), std(roi_stds_old(idx, r)));
+            features.stds_norm(idx, r) = bsxfun( @minus, features.stds(idx, r),mean(features.stds(idx, r)));
+            features.stds_norm(idx, r) = bsxfun( @rdivide, features.stds_norm(idx, r), std(features.stds(idx, r)));
             
-            roi_means(idx, r) = bsxfun( @minus, roi_means_old(idx, r),mean(roi_means_old(idx, r)));
-            roi_means(idx, r) = bsxfun( @rdivide, roi_means(idx, r), std(roi_means_old(idx, r)));
+            features.means_norm(idx, r) = bsxfun( @minus, features.means(idx, r),mean(features.means(idx, r)));
+            features.means_norm(idx, r) = bsxfun( @rdivide, features.means_norm(idx, r), std(features.means(idx, r)));
             
             % session 2 
             idx = ~session1_idx;
-            roi_stds(idx, r) = bsxfun( @minus, roi_stds_old(idx, r),mean(roi_stds_old(idx, r)));
-            roi_stds(idx, r) = bsxfun( @rdivide, roi_stds(idx, r), std(roi_stds_old(idx, r)));
+            features.stds_norm(idx, r) = bsxfun( @minus, features.stds(idx, r),mean(features.stds(idx, r)));
+            features.stds_norm(idx, r) = bsxfun( @rdivide, features.stds(idx, r), std(features.stds(idx, r)));
             
-            roi_means(idx, r) = bsxfun( @minus, roi_means_old(idx, r),mean(roi_means_old(idx, r)));
-            roi_means(idx, r) = bsxfun( @rdivide, roi_means(idx, r), std(roi_means_old(idx, r)));
+            features.means_norm(idx, r) = bsxfun( @minus, features.means(idx, r),mean(features.means(idx, r)));
+            features.means_norm(idx, r) = bsxfun( @rdivide, features.means_norm(idx, r), std(features.means(idx, r)));
         end
     elseif normalize == 3
         
         % session 1
         idx = session1_idx;
-        roi_stds(idx,:) = bsxfun( @minus, roi_stds_old(idx,:),mean(roi_stds_old(idx,:)));
-        roi_stds(idx,:) = bsxfun( @rdivide, roi_stds(idx,:), std(roi_stds_old(idx,:)));
+        features.stds_norm(idx,:) = bsxfun( @minus, features.stds(idx,:),mean(features.stds(idx,:)));
+        features.stds_norm(idx,:) = bsxfun( @rdivide, features.stds_norm(idx,:), std(features.stds(idx,:)));
         
-        roi_means(idx,:) = bsxfun( @minus, roi_means_old(idx,:),mean(roi_means_old(idx,:)));
-        roi_means(idx,:) = bsxfun( @rdivide, roi_means(idx,:), std(roi_means_old(idx,:)));
+        features.means_norm(idx,:) = bsxfun( @minus, features.means(idx,:),mean(features.means(idx,:)));
+        features.means_norm(idx,:) = bsxfun( @rdivide, features.means_norm(idx,:), std(features.means(idx,:)));
         
         % session 2
         idx = ~session1_idx;
-        roi_stds(idx,:) = bsxfun( @minus, roi_stds_old(idx,:),mean(roi_stds_old(idx,:)));
-        roi_stds(idx,:) = bsxfun( @rdivide, roi_stds(idx,:), std(roi_stds_old(idx,:)));
+        features.stds_norm(idx,:) = bsxfun( @minus, features.stds(idx,:),mean(features.stds(idx,:)));
+        features.stds_norm(idx,:) = bsxfun( @rdivide, features.stds_norm(idx,:), std(features.stds(idx,:)));
         
-        roi_means(idx,:) = bsxfun( @minus, roi_means_old(idx,:),mean(roi_means_old(idx,:)));
-        roi_means(idx,:) = bsxfun( @rdivide, roi_means(idx,:), std(roi_means_old(idx,:)));
+        features.means_norm(idx,:) = bsxfun( @minus, features.means(idx,:),mean(features.means(idx,:)));
+        features.means_norm(idx,:) = bsxfun( @rdivide, features.means_norm(idx,:), std(features.means(idx,:)));
     end
-else
-    roi_stds = roi_stds_old;
-    roi_means = roi_means_old;
 end
 
 %% Get new roi indices into old rois
-[new_rois_old_idx] = get_new_roi_index_into_old_rois();
+[new_rois_old_idx] = get_new_roi_index_into_old_rois(rd);
 
 %% Compute ROI Ordering
-filename = fullfile('..','FMRI','BrainVisualization','Network Classification','ROI_299_list.csv');
+filename = fullfile(rd, '..','FMRI','BrainVisualization','Network Classification','ROI_299_list.csv');
 T = readtable(filename);
 T = table(T.Index, T.aal_brodmannLabel, T.notes, 'VariableNames', {'ROI', 'label', 'notes'});
 T = T(new_rois_old_idx,:);
@@ -220,6 +184,8 @@ hemisphere(right) = {'right'};
 hemisphere(center) = {'center'};
 
 % sort
+regionlobes(bad_roi) = []; 
+hemisphere(bad_roi) = []; 
 [~, lobe_idx] = sort(regionlobes);
 [~, hemi_idx] = sort(hemisphere);
 
@@ -240,14 +206,14 @@ if plot_ordered
     elseif strcmp(roi_sort_by, 'Hemisphere')
         [unique_lobes,first_lobe_occurances,~] = unique(hemisphere(sort_idx), 'first'); % get first occurance of each unique element
     end
-    h = figure(1); clf;
+    h = figure(); clf;
     h.Position =[92 0 1638 665];
     h1 = subplot(1,2,1);
     
     [unique_subjs,first_subj_occurances,~] = unique(combs(:,1), 'first'); % get first occurance of each unique element
     
     
-    image(roi_stds(:,sort_idx), 'CDataMapping', colormapping); colorbar; hold on;
+    image(features.stds(:,sort_idx), 'CDataMapping', colormapping); colorbar; hold on;
     h1.YTick = first_subj_occurances(1:5:end) + K/2;
     h1.YTickLabels = 1:5:length(unique_subjs);
     
@@ -269,7 +235,7 @@ if plot_ordered
     if grid_on
         for i = 1:length(first_lobe_occurances)
             x = first_lobe_occurances(i);
-            plot([x,x], [1 size(roi_stds,1)], 'k', 'LineWidth', 1); hold on;
+            plot([x,x], [1 size(features.stds,1)], 'k', 'LineWidth', 1); hold on;
         end
     end
     
@@ -278,7 +244,7 @@ if plot_ordered
     h2 = subplot(1,2,2);
     
     [unique_tasks,first_task_occurances,~] = unique(sorted_tasks, 'first'); % get first occurance of each unique element
-    image(roi_stds(task_sort_idx, sort_idx), 'CDataMapping', colormapping); colorbar; hold on;
+    image(features.stds(task_sort_idx, sort_idx), 'CDataMapping', colormapping); colorbar; hold on;
     h2.YTick = first_task_occurances + NSboth/2;
     h2.YTickLabels = task_labels(unique_tasks);
     
@@ -309,7 +275,8 @@ if plot_ordered
         end
     end
     
-    filename = fullfile('images', sprintf('functional_variance_subject_vs_task_heatmap_%s_normalize=%d', roi_sort_by, normalize));
+    filename = fullfile(rd, 'images', sprintf('functional_variance_subject_vs_task_heatmap_%s_normalize=%d_truncate%d', ...
+        roi_sort_by, normalize, truncate));
     print(filename, '-depsc');
     
 end
@@ -321,10 +288,10 @@ if plot_19_subjs_subj
     session1 = and(combs(:,3) == 1, bothsess);
     session2 = and(combs(:,3) == 2, bothsess);
     
-    roi_stds_sess1 = roi_stds(session1, :);
-    roi_stds_sess2 = roi_stds(session2, :);
+    features.stds_sess1 = features.stds(session1, :);
+    features.stds_sess2 = features.stds(session2, :);
     
-    h = figure(2); clf;
+    h = figure(); clf;
     h.Position =[92 0 1638 665];
     
     % session 1
@@ -333,7 +300,7 @@ if plot_19_subjs_subj
     [sess1_subjs, sort_idx] = sort(combs(session1, 1));
     [unique_subjs,first_subj_occurances,~] = unique(sess1_subjs, 'first'); % get first occurance of each unique element
     
-    image(roi_stds_sess1(sort_idx, lobe_idx), 'CDataMapping', colormapping); colorbar;
+    image(features.stds_sess1(sort_idx, lobe_idx), 'CDataMapping', colormapping); colorbar;
     if normalize == 0
         caxis([cmin, cmax]);
     end
@@ -375,16 +342,16 @@ if plot_19_subjs_subj
     [sess2_subjs, sort_idx] = sort(combs(session2, 1));
     [unique_subjs,first_subj_occurances,~] = unique(sess2_subjs, 'first'); % get first occurance of each unique element
     
-    if remove_outlier
-        [~,ii] = max(roi_stds_sess2(:));
-        roi_stds_sess2(ii) = mean(roi_stds_sess2(:));
-        image(roi_stds_sess2(sort_idx, :), 'CDataMapping', colormapping); colorbar;
+    if remove_max
+        [~,ii] = max(features.stds_sess2(:));
+        features.stds_sess2(ii) = mean(features.stds_sess2(:));
+        image(features.stds_sess2(sort_idx, :), 'CDataMapping', colormapping); colorbar;
         if normalize == 0
             caxis([cmin, cmax]);
         end
         hold on;
     else
-        image(roi_stds_sess2(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
+        image(features.stds_sess2(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
         if normalize == 0
             caxis([cmin, cmax]);
         end
@@ -421,7 +388,8 @@ if plot_19_subjs_subj
             plot([1 length(task_sort_idx)], [y,y], 'k', 'LineWidth', 1); hold on;
         end
     end
-    filename = fullfile('images', sprintf('FV_19_subjs_heatmap_subjorder_%s_normalize=%d', roi_sort_by, normalize));
+    filename = fullfile(rd, 'images', sprintf('FV_19_subjs_heatmap_subjorder_%s_normalize=%d_whs%d_truncate%d',...
+        roi_sort_by, normalize, whs, truncate));
     print(filename, '-depsc');
     
 end
@@ -436,8 +404,8 @@ if plot_19_subjs_task
     session1 = and(combs(:,3) == 1, bothsess);
     session2 = and(combs(:,3) == 2, bothsess);
     
-    roi_stds_sess1 = roi_stds(session1, :);
-    roi_stds_sess2 = roi_stds(session2, :);
+    features.stds_sess1 = features.stds(session1, :);
+    features.stds_sess2 = features.stds(session2, :);
     
     taskid = combs(:,2);
     [sess1_tasks, sort_idx] = sort(taskid(session1));
@@ -448,14 +416,14 @@ if plot_19_subjs_task
         [unique_lobes,first_lobe_occurances,~] = unique(hemisphere(hem_idx), 'first'); % get first occurance of each unique element
     end
     
-    h = figure(3); clf;
+    h = figure(); clf;
     h.Position =[92 0 1638 665];
     
     % session 1
     h1 = subplot(1,2,1);
     
     [unique_tasks,first_task_occurances,~] = unique(sess1_tasks, 'first'); % get first occurance of each unique element
-    image(roi_stds_sess1(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
+    image(features.stds_sess1(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
     
     K = length(unique_tasks);
     
@@ -509,16 +477,16 @@ if plot_19_subjs_task
         [unique_lobes,first_lobe_occurances,~] = unique(hemisphere(hem_idx), 'first'); % get first occurance of each unique element
     end
     
-    if remove_outlier
-        [~,ii] = max(roi_stds_sess2(:));
-        roi_stds_sess2(ii) = mean(roi_stds_sess2(:));
-        image(roi_stds_sess2(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
+    if remove_max
+        [~,ii] = max(features.stds_sess2(:));
+        features.stds_sess2(ii) = mean(features.stds_sess2(:));
+        image(features.stds_sess2(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
         if normalize == 0
             caxis([cmin, cmax]);
         end
         hold on;
     else
-        image(roi_stds_sess2(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
+        image(features.stds_sess2(sort_idx,lobe_idx), 'CDataMapping', colormapping); colorbar;
         if normalize == 0
             caxis([cmin, cmax]);
         end
@@ -556,7 +524,8 @@ if plot_19_subjs_task
         end
     end
     
-    filename = fullfile('images', sprintf('FV_19_subjs_heatmap_taskorder_%s_normalize=%d', roi_sort_by, normalize));
+    filename = fullfile(rd, 'images', sprintf('FV_19_subjs_heatmap_taskorder_%s_normalize=%d_whs%d_truncate%d', ...
+        roi_sort_by, normalize, whs, truncate));
     print(filename, '-depsc');
     
 end
@@ -567,34 +536,34 @@ end
 if plot_sanity_check
     
     % sort each subject by highest var
-    roi_stds_sort = zeros(size(roi_stds));
-    for s = 1:size(roi_stds,1)
-        roi_stds_sort(s,:) = sort(roi_stds(s,:));
+    features.stds_sort = zeros(size(features.stds));
+    for s = 1:size(features.stds,1)
+        features.stds_sort(s,:) = sort(features.stds(s,:));
     end
     
     % make some random data
-    roi_stds_rand_sort = zeros(size(roi_stds));
-    for s = 1:size(roi_stds,1)
-        indices = datasample(1:size(roi_stds,1), NR); % sample a subject to take value from for each region
+    features.stds_rand_sort = zeros(size(features.stds));
+    for s = 1:size(features.stds,1)
+        indices = datasample(1:size(features.stds,1), NR); % sample a subject to take value from for each region
         
         rand_subj = zeros(1,NR);
         for r = 1:NR
-            rand_subj(r) = roi_stds(indices(r), r); % choose ROI from subject we sampled
+            rand_subj(r) = features.stds(indices(r), r); % choose ROI from subject we sampled
         end
-        roi_stds_rand_sort(s,:) = rand_subj;
+        features.stds_rand_sort(s,:) = rand_subj;
     end
     
-    for s = 1:size(roi_stds,1)
-        roi_stds_rand_sort(s,:) = sort(roi_stds_rand_sort(s,:));
+    for s = 1:size(features.stds,1)
+        features.stds_rand_sort(s,:) = sort(features.stds_rand_sort(s,:));
     end
     
-    h = figure(3); clf;
+    h = figure(); clf;
     h.Position =[92 0 600 600];
     
     % session 1
     subplot(1,1,1);
     
-    h1 = plot(roi_stds_sort(combs(:,3) == 1, :)', 'Color', [0 0 1 0.5]); hold on;
+    h1 = plot(features.stds_sort(combs(:,3) == 1, :)', 'Color', [0 0 1 0.5]); hold on;
     
     title(sprintf('Session 1 Sorted FVs'));
     xlabel('ROI (sorted by FV)');
@@ -602,7 +571,7 @@ if plot_sanity_check
     
     %h2 = subplot(1,2,2);
     
-    h2 = plot(roi_stds_rand_sort(combs(:,3) == 1, :)', 'Color', [1 0 0 0.5]);
+    h2 = plot(features.stds_rand_sort(combs(:,3) == 1, :)', 'Color', [1 0 0 0.5]);
     
     title(sprintf('Session 1 Sorted FVs'));
     xlabel('ROI (sorted by FV)');
@@ -611,7 +580,8 @@ if plot_sanity_check
     h = legend([h1(1), h2(1)], {'sorted subjects', 'sorted random'});
     
     xlim([1,NR]);
-    filename = fullfile('images', sprintf('functional_variance_sorted_vs_random_%s', roi_sort_by));
+    filename = fullfile(rd, 'images', sprintf('functional_variance_sorted_vs_random_%s_truncate%d', ...
+        roi_sort_by, truncate));
     print(filename, '-depsc');
 end
 
@@ -625,10 +595,10 @@ if plot_19_subjs_subj_mean
     session1 = and(combs(:,3) == 1, bothsess);
     session2 = and(combs(:,3) == 2, bothsess);
     
-    roi_means_sess1 = roi_means(session1, :);
-    roi_means_sess2 = roi_means(session2, :);
+    features.means_norm_sess1 = features.means_norm(session1, :);
+    features.means_norm_sess2 = features.means_norm(session2, :);
     
-    h = figure(4); clf;
+    h = figure(); clf;
     h.Position =[92 0 1638 665];
     
     % session 1
@@ -637,7 +607,7 @@ if plot_19_subjs_subj_mean
     [sess1_subjs, sort_idx] = sort(combs(session1, 1));
     [unique_subjs,first_subj_occurances,~] = unique(sess1_subjs, 'first'); % get first occurance of each unique element
     
-    image(roi_means_sess1(:,sort_idx), 'CDataMapping', colormapping); colorbar;
+    image(features.means_norm_sess1(:,sort_idx), 'CDataMapping', colormapping); colorbar;
     if normalize == 0
         caxis([cmin, cmax]);
     end
@@ -678,16 +648,16 @@ if plot_19_subjs_subj_mean
     [sess2_subjs, sort_idx] = sort(combs(session2, 1));
     [unique_subjs,first_subj_occurances,~] = unique(sess2_subjs, 'first'); % get first occurance of each unique element
     
-    if remove_outlier
-        [~,ii] = max(roi_means_sess2(:));
-        roi_means_sess2(ii) = mean(roi_means_sess2(:));
-        image(roi_means_sess2(:,sort_idx), 'CDataMapping', colormapping); colorbar;
+    if remove_max
+        [~,ii] = max(features.means_norm_sess2(:));
+        features.means_norm_sess2(ii) = mean(features.means_norm_sess2(:));
+        image(features.means_norm_sess2(:,sort_idx), 'CDataMapping', colormapping); colorbar;
         if normalize == 0
             caxis([cmin, cmax]);
         end
         hold on;
     else
-        image(roi_means_sess2(:,sort_idx), 'CDataMapping', colormapping); colorbar;
+        image(features.means_norm_sess2(:,sort_idx), 'CDataMapping', colormapping); colorbar;
         if normalize == 0
             caxis([cmin, cmax]);
         end
@@ -723,21 +693,32 @@ if plot_19_subjs_subj_mean
             plot([1 length(task_sort_idx)], [y,y], 'k', 'LineWidth', 1); hold on;
         end
     end
-    filename = fullfile('images', sprintf('M_19_subjs_heatmap_subjorder_%s_normalize=%d', roi_sort_by, normalize));
+    filename = fullfile(rd, 'images', sprintf('M_19_subjs_heatmap_subjorder_%s_normalize=%d_truncate%d', ...
+        roi_sort_by, normalize, truncate));
     print(filename, '-dpng');
     
 end
 
 
+%% Get Mean FD and sort 
 
 
 
 
 
+mFD1 = load(fullfile(rd, '..', 'FMRI', 'restingstatedata', 'meanFD_174subj.mat')); 
+mFD2 = load(fullfile(rd, '..', 'FMRI', 'restingstatedata', 'batch2_meanFD.mat'));
 
 
+%% Load Head Motion
+load( fullfile( rd, '..', 'FMRI', 'restingstatedata', 'meanFD_174subj.mat'));
+analysis_subjs = subjs;
+% x = load( fullfile( '..', 'FMRI', 'restingstatedata', 'batch2_meanFD.mat'));
+% meanFD_2 = x.meanFD;
+load( fullfile( rd, '..', 'FMRI', 'restingstatedata', 'motion_203Subj.mat'));
+motion = motion( ismember( subjs, analysis_subjs), :);
 
-
+[NS, T] = size(motion);
 
 
 

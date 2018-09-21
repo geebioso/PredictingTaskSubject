@@ -1,15 +1,15 @@
 function [wd, rd] = set_directories(isHPC)
 
-% working directory 
+% working directory (code) 
 if isHPC
     wd = '/data/users/ggaut/BV/'; 
 else
-   wd = fullfile( getenv('HOME'), 'Dropbox',  'anatomical'); 
+   wd = fullfile( getenv('HOME'), 'Dropbox',  'anatomical', 'pred_task_subj'); 
 end
 
-% results directory 
+% results directory (also main diarectory in this case) 
 if isHPC 
     rd = '/pub/ggaut/BV/'; 
 else
-   rd = wd;  
+   rd = fullfile( getenv('HOME'), 'Dropbox', 'anatomical' );  
 end

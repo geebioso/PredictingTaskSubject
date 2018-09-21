@@ -1,9 +1,14 @@
+function [] = plot_LR_all_accuacies(isHPC, classifiertype, truncate) 
 
-% NOTE: THE ORDER OF DATASETS IN AC IS IMPORTANT!!!!
-% MAKE SURE WHSET 21 is first
+[wd, rd] = set_directories(isHPC); % working directory and results directory
 
 task_only = 1;
-baseline = 'whset26'; 
+baseline = sprintf( 'whs%s', genvarname('0')); 
+
+if ~ismember( classifiertype , [0,6])
+   error( 'classifier type not supported for this function')  
+end
+    
 
 % Default font size
 set(0,'defaultAxesFontSize',12);
@@ -26,22 +31,26 @@ feat_types.FCCS = 'FC';
 
 set_descriptions0 = struct();
 
-% PUT BASELINE FIRST!!!!!
-set_descriptions0.whset26 = {'200s Filter','ICA','With Experimental Design','GM Regressed Out'};
+set_descriptions0.(sprintf('whs%s', genvarname('-1'))) = {'90s Filter' 'No ICA' 'With Experimental Design' 'CSF+WM Regressed Out'};
+set_descriptions0.(sprintf('whs%s', genvarname('0'))) = {'200s Filter','ICA','With Experimental Design','GM Regressed Out'};
+set_descriptions0.(sprintf('whs%s', genvarname('1'))) = {'200s Filter','ICA','With Experimental Design','CSF+WM Regressed Out'};
+set_descriptions0.(sprintf('whs%s', genvarname('2'))) = {'200s Filter','No ICA','With Experimental Design','GM Regressed Out'};
+set_descriptions0.(sprintf('whs%s', genvarname('3'))) = {'200s Filter','ICA','Experimental Design Regressed Out','GM Regressed Out'};
 
+%% Load Data 
+filenm = fullfile( rd, 'Results', sprintf('AC_c%d_truncate%d', classifiertype, truncate));
+load(filenm); 
 
-set_descriptions0.whset8 = {'90s Filter' 'No ICA' 'With Experimental Design' 'CSF+WM Regressed Out'};
-set_descriptions.whset20 = {'200s Filter','ICA','Experimental Design Regressed Out','CSF+WM Regressed Out'};
-set_descriptions0.whset21 = {'200s Filter','No ICA','With Experimental Design','CSF+WM Regressed Out'};
-set_descriptions0.whset22 = {'200s Filter','ICA','With Experimental Design','CSF+WM Regressed Out'};
-set_descriptions0.whset23 = {'200s Filter','No ICA','With Experimental Design','GM Regressed Out'};
-set_descriptions0.whset24 = {'200s Filter','No ICA','Experimental Design Regressed Out','CSF+WM Regressed Out'};
-set_descriptions0.whset27 = {'200s Filter','ICA','Experimental Design Regressed Out','GM Regressed Out'};
+baseline_idx = find( strcmp(fieldnames(AC), baseline)); 
 
-AC2 = AC;
-set_fields = fieldnames(AC2);
-rep_fields = fieldnames(AC2.(set_fields{1}));
-NPT = size(AC2.(baseline).BVSD,1); % number of prediction tasks 
+if isempty(baseline_idx)
+   error(['Accuracy not computed for baseline dataset. Either respecify', ...
+       ' baseline dataset or run models for baseline dataset']); 
+end
+
+set_fields = fieldnames(AC);
+rep_fields = fieldnames(AC.(set_fields{baseline_idx}));
+NPT = size(AC.(baseline).BVSD,1); % number of prediction tasks 
 NS  = length(set_fields); % number of datasets 
 NR  = length(rep_fields); % number of feature representations 
 pred_tasks = {'Task Classification\nWithin Session', 'Task Classification\nBetween Session', ...
@@ -75,7 +84,7 @@ for i = 1:NS
     set_field = set_fields{i};
     for j = 1:NR
         rep_field = rep_fields{j};
-        A(:,i,j) = AC2.(set_field).(rep_field);
+        A(:,i,j) = AC.(set_field).(rep_field);
         C(:,i,j,:) = CR.(set_field).(rep_field); 
         
         for t = 1:NPT
@@ -131,7 +140,7 @@ markers = '+o*xsd^';
 map = brewermap(length(set_fields), 'Set1');
 clear lines
 
-h0 = figure(1); clf;
+h0 = figure(); clf;
 if task_only
     h0.Position = [152 377 998 328];
 else
@@ -190,7 +199,7 @@ allpairs = allpairs(tokeep,:);
 NP = size(allpairs,1);
 
 for p = 1:NP
-    h0 = figure(p+NP+1); clf;
+    h0 = figure(); clf;
     if task_only
          h0.Position = [371 356 670 296];
     else
@@ -263,32 +272,6 @@ for p = 1:NP
     
 end
 
-%% Pairwise One Figure Bar
-%
-% allpairs = nchoosek(set_fields,2);
-% NP = size(allpairs,1);
-%
-% labels = repmat(rep_fields, 4, 1);
-%
-% for p = 1:NP
-%     h0 = figure(p+2*NP+1); clf;
-%     h0.Position = [1 193 670 512];
-%     pair_now = allpairs(p,:);
-%
-%     set1_idx = ismember( set_fields, pair_now{1});
-%     set2_idx = ismember( set_fields, pair_now{2});
-%
-%
-%
-%     h = barh( [reshape( squeeze( A(:,set1_idx,:))', NPT*NR, 1) reshape( squeeze( A(:,set2_idx,:))', NPT*NR,1)]);
-%     set(gca, 'YTick', 1:(NPT*NR));
-%     set(gca, 'YTickLabel', strrep( labels, '_', ' '));
-%
-%     title(pred_tasks{t})
-%
-% end
-
-
 %% Pairwise scatter
 if ~task_only
     allpairs = nchoosek(set_fields,2);
@@ -306,7 +289,7 @@ if ~task_only
     markers = '^sxo';
     
     for p = 1:NP
-        h0 = figure(p +3*NP+1); clf;
+        h0 = figure(); clf;
         h0.Position = [1 193 670 512];
         pair_now = allpairs(p,:);
         

@@ -1,4 +1,6 @@
 format_data_for_OSF.m
 DatatoHPC.bash
 FilestoHPC.bash
+.DS_Store
+crap.m 
 

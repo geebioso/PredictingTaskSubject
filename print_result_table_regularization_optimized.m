@@ -1,14 +1,14 @@
-function [ AC , CR, CORRECT, best_costs, tab ] = print_result_table_regularization_optimized( classifiertype, whsets, isHPC)
+function [ AC , CR, CORRECT, best_costs, tab ] = print_result_table_regularization_optimized( classifiertype, whsets, isHPC, truncate)
+
 [wd, rd] = set_directories(isHPC);
 
-
 if classifiertype ~= 8
-pred_task = 'both'; 
-else 
-   pred_task = 'task';  
+    pred_task = 'task'; % both
+else
+    error( 'DO NOT USE classifiertype=8. DEPRECATED. USE finn_et_al_analysis.m INSTEAD');
 end
 
-whreps = [1,4,7:9]; % 10]; % [1,2,4,9,10]
+whreps = [1,4, 7:9]; % 10]; % [1,2,4,9,10]
 whreps_labels = { 'BVSD', 'BVM', 'BVVS', 'BVV', 'MSSD', 'SQRT_MSSD', 'FCP', 'FCC', 'FCCV', 'FCCS'};
 whreps_type = {'BV', 'BV', 'BV', 'BV', 'BV', 'BV', 'FC', 'FC', 'FC', 'FC' };
 
@@ -27,20 +27,8 @@ costs = [ 1e-10 1e-9 1e-8 1e-7 1e-6 0.00001, 0.0001, 0.001, 0.01, .1, 1, 10, 100
 
 print_dataset = 1;
 
-% FOR 1NN
-%classifiertypes = 8;
-%filename = 'Results/nearest_neighbor_latex_table.txt';
-
-% FOR LR
-% classifiertypes = 0;
-
-if classifiertype == 8
-    filename = fullfile(getenv('HOME'), 'Dropbox', 'anatomical', 'Results',...
-        '1NN_all_latex_table_regularization_optimized_HCP.txt');
-else
-    filename = fullfile(getenv('HOME'), 'Dropbox', 'anatomical', 'Results',...
-        'LR_all_latex_table_regularization_optimized_HCP.txt');
-end
+latex_filename = fullfile(getenv('HOME'), 'Dropbox', 'anatomical', 'Results',...
+    'LR_all_latex_table_regularization_optimized_HCP.txt');
 
 [ datasetnames] = load_dataset_names();
 
@@ -57,11 +45,11 @@ p = 0.95;
 
 % accuracy, credible interval, storage
 AC = struct();
-CR = struct(); 
-CORRECT = struct(); 
+CR = struct();
+CORRECT = struct();
 
 %% Print Headers
-f = fopen(filename, 'w');
+f = fopen(latex_filename, 'w');
 
 if strcmp( pred_task, 'task')
     fprintf(f, '\\begin{tabular}{ l l l l l } \n \\hline \\\\[-1ex] ');
@@ -80,20 +68,22 @@ end
 for whs = whsets
     
     if print_dataset
+        data_set_idx = find([datasetnames{:,2}]== whs);
         if any(strcmp( pred_task, {'task', 'subj'}))
-            fprintf(f, '\n \\multicolumn{5}{l}{Dataset %d: %s }\\\\ \\cline{1-5} \\\\ \\\\[-2ex] \n', whs, strrep( datasetnames{whs}, '_', '\_'));
+            fprintf(f, '\n \\multicolumn{5}{l}{Dataset %d: %s }\\\\ \\cline{1-5} \\\\ \\\\[-2ex] \n ', ...
+                whs, strrep( datasetnames{data_set_idx, 1}, '_', '\_'));
         else
-            fprintf(f, '\n \\multicolumn{7}{l}{Dataset %d: %s }\\\\ \\cline{1-7} \\\\ \\\\[-2ex] \n', whs, strrep( datasetnames{whs}, '_', '\_'));
+            fprintf(f, '\n \\multicolumn{7}{l}{Dataset %d: %s }\\\\ \\cline{1-7} \\\\ \\\\[-2ex] \n ', ...
+                whs, strrep( datasetnames{data_set_idx, 1}, '_', '\_'));
         end
     end
     
-    load(fullfile(rd, 'features', sprintf('whs%d.mat', whs)), 'NT');
+    load(fullfile(rd, 'features', sprintf('whs%d_truncate%d.mat', whs, truncate)), 'NT');
     
     %% Print Body
     
-    
-    filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_valid' ,...
-        1 , whs , 0, 1) ];
+    filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_truncate%d_valid' ,...
+        1 , whs , 0, 1, truncate) ];
     
     x = load(filenm);
     modelnow = x.modelnow;
@@ -111,20 +101,17 @@ for whs = whsets
     for i = 1:length(whreps)
         whrep = whreps(i);
         
-        fprintf(f, '%s & %s & %s', whreps_type{whrep}, strrep( whreps_labels{whrep}, '_', '\_'), whrep_feat_no{whrep});
+        fprintf(f, '%s & %10.10s & %20.20s', whreps_type{whrep}, strrep( whreps_labels{whrep}, '_', '\_'), whrep_feat_no{whrep});
         
         accuracies = zeros(4,1);
-        creds = zeros(4,2); 
-        corrects = cell(4,1); 
+        creds = zeros(4,2);
+        corrects = cell(4,1);
         for pt = dopredtasks
             
-            if classifiertype == 8
-                filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d' ,...
-                    pt , whs , classifiertype , whrep ) ];
-            else
-                filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_valid' ,...
-                    pt , whs , classifiertype , whrep ) ];
-            end
+            
+            filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_truncate%d_valid' ,...
+                pt , whs , classifiertype , whrep, truncate ) ];
+            
             
             % Beta Binomial Hyperparameters set for mode at chance level
             % performance
@@ -139,32 +126,13 @@ for whs = whsets
             try
                 load(filenm);
                 
-                if classifiertype == 8
-                    %% overall accuracies
-                    if pt == 1 || pt ==2
-                        error('Task classification not supported');
-                    elseif pt == 3
-                        W = W(eye(NT) == 0);
-                        W = [W{:}];
-                        correct = W(:);
-                        accuracy = mean(correct);
-                        [ cred, pbayesmean, alpha_post, beta_post] = beta_binomial_cred_interval(alpha, beta, correct, p);
-                        cred = cred;
-                    elseif pt == 4
-                        B2 = [B{:}];
-                        correct = B2(:);
-                        accuracy = mean(correct);
-                        [ cred, pbayesmean, alpha_post, beta_post] = beta_binomial_cred_interval(alpha, beta, correct, p);
-                        cred = cred;
-                    end
-                    
-                else
-                    costlabel = strrep( num2str(best_cost), '.', '_');  % costlabels{ bestcostidx( pt, i )};
-                    fprintf('Loading %s, Best cost = %s\n', filenm, costlabel);
-                    correct = Y_pred(Y_pred~=0) == YTRUE(Y_pred ~=0);
-                    accuracy = mean(correct);
-                    [ cred, pbayesmean, alpha_post, beta_post] = beta_binomial_cred_interval(alpha, beta, correct, p);
-                end
+                
+                costlabel = strrep( num2str(best_cost), '.', '_');  % costlabels{ bestcostidx( pt, i )};
+                fprintf('Loading %s, Best cost = %s\n', filenm, costlabel);
+                correct = Y_pred(Y_pred~=0) == YTRUE(Y_pred ~=0);
+                accuracy = mean(correct);
+                [ cred, pbayesmean, alpha_post, beta_post] = beta_binomial_cred_interval(alpha, beta, correct, p);
+                
                 
                 % convert to percent
                 cred = cred*100;
@@ -172,8 +140,8 @@ for whs = whsets
                 
                 fprintf(f, ' & %3.0f (%d, %d)', accuracy, round(cred(1)), round(cred(2)));
                 accuracies(pt) = accuracy;
-                creds(pt, :) = cred; 
-                corrects{pt} = correct; 
+                creds(pt, :) = cred;
+                corrects{pt} = correct;
                 
             catch
                 fprintf('\t FILE NOT FOUND: %s\n', filenm);
@@ -181,10 +149,10 @@ for whs = whsets
             end
         end
         
-        AC.(sprintf('whset%d', whs)).(whreps_labels{whrep}) = accuracies;
-        CR.(sprintf('whset%d', whs)).(whreps_labels{whrep}) = creds;
-        CORRECT.(sprintf('whset%d', whs)).(whreps_labels{whrep}) = corrects;
-            
+        AC.(sprintf('whs%s', genvarname(num2str(whs)))).(whreps_labels{whrep}) = accuracies;
+        CR.(sprintf('whs%s', genvarname(num2str(whs)))).(whreps_labels{whrep}) = creds;
+        CORRECT.(sprintf('whs%s', genvarname(num2str(whs)))).(whreps_labels{whrep}) = corrects;
+        
         
         fprintf(f, ' \\\\ \n ');
     end
@@ -198,72 +166,71 @@ end
 
 fprintf(f, '\\\\[-1.5ex] \\hline \n \\end{tabular}');
 
-% Save AC 
-if classifiertype ~= 8
-    filenm = fullfile( rd, 'Results', sprintf('AC_c%d', classifiertype)); 
-    save(filenm, 'AC'); 
-end
+% Save AC
+
+filenm = fullfile( rd, 'Results', sprintf('AC_c%d_truncate%d', classifiertype, truncate));
+save(filenm, 'AC', 'CR', 'CORRECT' );
 
 
 
 %% Print Best Costs
-if classifiertype ~= 8
+
+best_costs = zeros( length(whsets), length(whreps), length(dopredtasks));
+for j = 1:length(whsets)
+    whs = whsets(j);
     
-    best_costs = zeros( length(whsets), length(whreps), length(dopredtasks));
-    for j = 1:length(whsets)
-        whs = whsets(j);
+    for i = 1:length(whreps)
+        whrep = whreps(i);
         
-        for i = 1:length(whreps)
-            whrep = whreps(i);
+        for pt = dopredtasks
             
-            for pt = dopredtasks
+            
+            %                  filenm = [ 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_cost%s' ,...
+            %                     pt , whs , classifiertype , whrep, costlabel ) ];
+            filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_truncate%d_valid' ,...
+                pt , whs , classifiertype , whrep, truncate ) ];
+            
+            
+            try
+                load(filenm);
+                costlabel = strrep( num2str(best_cost), '.', '_');  % costlabels{ bestcostidx( pt, i )};
+                fprintf('Loading %s, Best cost = %s\n', filenm, costlabel);
                 
-                
-                %                  filenm = [ 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_cost%s' ,...
-                %                     pt , whs , classifiertype , whrep, costlabel ) ];
-                filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_valid' ,...
-                    pt , whs , classifiertype , whrep ) ];
-                
-                
-                try
-                    load(filenm);
-                    costlabel = strrep( num2str(best_cost), '.', '_');  % costlabels{ bestcostidx( pt, i )};
-                    fprintf('Loading %s, Best cost = %s\n', filenm, costlabel);
-                    
-                    best_costs(whs, whrep, pt) = best_cost;
-                catch
-                    continue;
-                end
-                
+                best_costs(whs, i, pt) = best_cost;
+            catch
+                continue;
             end
+            
         end
     end
-else
-    best_costs = NaN; tab =NaN;
+end
+
+% print out latex table 
+f = fopen(latex_filename, 'r'); 
+line = fgets(f);
+while line ~= -1
+    fprintf('%s', line); 
+    line = fgets(f); 
 end
 
 %% Plot best costs for each representation
 
-if classifiertype ~=8
-    
-    py = zeros( length(whreps) , length(costs) );
-    count = 1;
-    for whrep = whreps
-        temp = squeeze( best_costs(:, whrep, :) );
-        temp = temp( whsets, :);
-        ps = hist( temp(:), costs );
-        py( count , : ) = ps * 100 / sum( ps );
-        count = count + 1;
-    end
-    
-    
-    % print table
-    ii = sum(py, 1) > 0;
-    py = [costs; py];
-    py = py(:,ii);
-    tab = table( ['costs'; whreps_labels(whreps)'], 'VariableName', {'whrep'});
-    tab = [tab, array2table( py)]
-    
+py = zeros( length(whreps) , length(costs) );
+count = 1;
+for i = 1:length(whreps)
+    temp = squeeze( best_costs(:, i, :) );
+    ps = hist( temp(:), costs );
+    py( count , : ) = ps * 100 / sum( ps );
+    count = count + 1;
 end
+
+
+% print table
+ii = sum(py, 1) > 0;
+py = [costs; py];
+py = py(:,ii);
+tab = table( ['costs'; whreps_labels(whreps)'], 'VariableName', {'whrep'});
+tab = [tab, array2table( py)]
+
 end
 

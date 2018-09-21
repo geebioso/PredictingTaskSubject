@@ -8,11 +8,12 @@
 % Feb 2 2017
 clear D;
 isHPC = 0;
+truncate = 1; 
 
 [wd, rd] = set_directories(isHPC); % working directory and results directory
 
-whsets = [26, 27];     % which data set? 8 is the most recent with edge voxels removed
-runIC = 0;   % run models with ICA results?0
+whsets = [-1:3];     % which data set? 
+runIC = 0;   % run models with ICA results?
 
 dopredtasks    = 3:4;%[1:5];
 % pt == 1, Predict Task Session 1
@@ -23,7 +24,7 @@ dopredtasks    = 3:4;%[1:5];
 
 K                 = 5; % number of folds, use 5 so that stratified cross validation tests points from all 19 subjects
 
-dorepresents      = [1,4,7:9 ];% [ 1,2,4,9:12 ];
+dorepresents      = [1:10 ];% [ 1,2,4,9:12 ];
 
 % whrep==1: ROI StdDev
 % whrep==2: ROI means
@@ -73,7 +74,7 @@ for whs = whsets
     load( fullfile(rd, 'tasklist.mat') );
     
     try
-        filenm = fullfile( rd, 'features', sprintf('whs%d.mat', whs));
+        filenm = fullfile( rd, 'features', sprintf('whs%d_truncate%d.mat', whs, truncate));
         fprintf('\tLoading %s\n', filenm);
         load( filenm );
         %                     NT: 9
@@ -211,7 +212,8 @@ for whs = whsets
             end
             
             % And save the resulting model trained on all of session 1 data
-            filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d' , pt , whs , classifiertype , whrep ) ];
+            filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_truncate%d' ,...
+                pt , whs , classifiertype , whrep, truncate ) ];
             save( filenm , 'W' , 'B', 'whs' , 'classifiertype', 'whrep' , 'featurelabels'); 
             
         end

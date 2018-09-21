@@ -1,35 +1,14 @@
-function [] = runclassifier_fully_parallelized(isHPC, whs, whrep, pt, truncate)
+function [] = run_feature_selection_models(isHPC, whs, whrep, pt)
+%%% This file will is the same as ../runclassifier_ICAdata_v7.m except that
+%%% is will run on the UCI HPC
+% Must do L1 regularization for variable selection 
 
-% INPUT
-%   logical isHPC: are we running this function on the UCI high performance cluster? 
-%   int whs: which dataset are we using? 
-%   int whrep: which feature representation are we using? 
-%   int pt: which prediction task are we doing? 
-%   logical truncate: should we truncate the time series to be the length
-%       of the shortest time series? 
+% isHPC = 0; whs = 26; whrep = 1;
 
-% whs==-1: old dataset (old OSU preprocessing pipeline) 
-% whs== 0: baseline ( HCP preprocessing pipeline ) 
-% whs== 1: dataset 1 ( HCP preprocessing pipeline ) 
-% whs== 2: dataset 2 ( HCP preprocessing pipeline ) 
-% whs== 3: dataset 3 ( HCP preprocessing pipeline )
+% March 26 2018
 
-% whrep==1: BVSD
-% whrep==2: M
-% whrep==3: BVVS
-% whrep==4: BVV
-% whrep==5: MSSD
-% whrep==6: SQRT MSSD
-% whrep==7: FCP
-% whrep==8: FCC
-% whrep==9: FCCV
-% whrep==10: FCCS
-
-% pt == 1, Predict Task Session 1 (target group)
-% pt == 2, Predict Task Session 2 (target group)
-% pt == 3, Predict Subject Session 1 (target group)
-% pt == 4, Predict Subject Session 2 (target group)
-% pt == 5, Predict Task Session 1 (all subjects) 
+% 8GB for features of size 269
+%
 
 if ~isa(isHPC, 'numeric')
     isHPC = str2num(isHPC);
@@ -38,15 +17,17 @@ if ~isa(isHPC, 'numeric')
     pt = str2num(pt); 
 end
 
-fprintf('isHPC=%d, whs=%d, whrep=%d, pt=%d, truncate=%d\n', isHPC, whs, whrep, pt, truncate);
+fprintf('isHPC=%d, whs=%d, whrep=%d, pt=%d\n', isHPC, whs, whrep, pt);
 
 %% Options
+dosave = 1; % save models?
+K                 = 2; % number of folds, use 5 so that stratified cross validation tests points from all 19 subjects
+classifiertype    = 6; % 0: L2 regression, 6:L1 regression or 7: L2 regression dual
 
-dosave = 1;            % save models?
-K                 = 5; % number of folds, use 5 so that stratified cross validation tests points from all 19 subjects
-innerK            = 2; % number of inner CV loop folds
-classifiertype    = 0; % 0: L2 regression, 6:L1 regression or 7: L2 regression dual
-costs = [ 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 0.00001, 0.0001, 0.001, 0.01, .1, 1, 10, 100, 1000];
+%costs = [ 1e-10 1e-9 1e-8 1e-7 1e-6 0.00001, 0.0001, 0.001, 0.01, .1, 1, 10, 100, 1000];
+%costs = 2.^(-20:10);
+costs = 1.1.^(-200:73); 
+
 NCO = length(costs);
 costlabels = cell(NCO,1);
 for c = 1:NCO
@@ -70,27 +51,54 @@ if isHPC
     fprintf('Using mex files in current directory\n');
 else
     if ispc
-        % addpath(fullfile(getenv('HOME'), 'Dropbox','FMRI','Projects','liblinear-2.11', 'windows'));
-        addpath(fullfile(wd, 'liblinear-2.11', 'windows'));
+        addpath(fullfile(getenv('HOME'), 'Dropbox','FMRI','Projects','liblinear-2.11', 'windows'));
     else
-        % addpath(fullfile(getenv('HOME'), 'Dropbox','FMRI','Projects','liblinear-2.11', 'matlab'));
-        addpath(fullfile(wd, 'liblinear-2.11', 'matlab'));
+        addpath(fullfile(getenv('HOME'), 'Dropbox','FMRI','Projects','liblinear-2.11', 'matlab'));
     end
 end
 %%
 
+% pt == 1, Predict Task Session 1
+% pt == 2, Predict Task Session 2
+% pt == 3, Predict Subject Session 1
+% pt == 4, Predict Subject Session 2
+% pt == 5, Predict Task Session 1 All Subject
+
+% whrep==1: ROI StdDev
+% whrep==2: ROI means
+% whrep==3: ROI FV scaled
+% whrep==4: ROI FV
+% whrep==5: MSSD
+% whrep==6: SQRT MSSD
+% whrep==7: ROI FC correlation
+% whrep==8: ROI FC covariance
+% whrep==9: ROI FC covariance and variance
+% whrep==10: ROI FCcov scaled
+
+
 featurelabels = { ...
-    'BVSD' , ...
-    'M' , ...
-    'BVVS',...
-    'BV',...
+    'StdDev ROIs' , ...
+    'Means  ROIs' , ...
+    'ROI FV scaled',...
+    'ROI FV',...
     'MSSD', ...
-    'SQRT_MSSD', ...
-    'FCP' , ...
-    'FCC', ...
-    'FCCV', ...
-    'FCCVS'
+    'SQRT_MSS', ...
+    'Corrs  ROIs' , ...
+    'Covs   ROIS', ...
+    'Covs+Vars ROIs', ...
+    'Covs   ROIS scaled'
     };
+
+% whrep==1: ROI StdDev
+% whrep==2: ROI means
+% whrep==3: ROI FV scaled
+% whrep==4: ROI FV
+% whrep==5: MSSD
+% whrep==6: SQRT MSSD
+% whrep==7: ROI FC correlation
+% whrep==8: ROI FC covariance
+% whrep==9: ROI FC covariance and variance
+% whrep==10: ROI FCcov scaled
 
 rng( seed );
 
@@ -106,7 +114,7 @@ predtasklabels = { ...
 load( fullfile(rd, 'tasklist.mat') );
 
 try
-    filenm = fullfile( rd, 'features', sprintf('whs%d_truncate%d.mat', whs, truncate));
+    filenm = fullfile( rd, 'features', sprintf('whs%d.mat', whs));
     fprintf('Loading %s\n', filenm);
     load( filenm );  
 %                     NT: 9
@@ -169,7 +177,7 @@ if pt==1 | pt==3
     insession2 = ismember(combs(whok,1), subsinbothsessions); % session 1 subjects that are also in session 2
     always_train = and(combs(whok,3) == 1, ~insession2) ;
     insession2 = find(insession2); % convert to numerical indices to index into training split later
-    nsets = K + 1;
+    nsets = K;
     whtrain_sets = cell( nsets , 1 );
     whtest_sets  = cell( nsets , 1 );
     cv = cvpartition( combs(insession2, 1),'kfold',K);
@@ -189,7 +197,7 @@ if pt==1 | pt==3
     
 elseif pt==5
     % CV partitions when generalizing to session 1 data
-    nsets = K + 1;
+    nsets = K;
     whtrain_sets = cell( nsets , 1 );
     whtest_sets  = cell( nsets , 1 );
     cv = cvpartition( length( Y ) ,'kfold',K);
@@ -290,11 +298,15 @@ Y_pred_cell = cell( nsets , 1 );
 YP_pred_cell = cell( nsets , 1 );
 models = cell( nsets , 1 );
 
-validate_acc = zeros( nsets, NCO );
+acc = zeros( nsets, NCO );
+nonzeros = cell(nsets, NCO); 
 for j=1:nsets
-    
+    fprintf('Fold=%d\n\tcost num=', j); 
     for c = 1:NCO
         
+        if mod(c, 10) == 0
+           fprintf('%d,', c);  
+        end
         cost = costs(c); % make sure
         % costlabel = strrep( num2str(cost), '.', '_');
         costlabel = costlabels{c};
@@ -310,119 +322,33 @@ for j=1:nsets
         
         % compute validation accuracy using the training data from
         % this fold
-        options = sprintf( '-s %d -c %3.20f -v %d -q' , classifiertype , ...
-            cost, innerK );
-        validate_acc(j,c) = train( Y_train , X_train, options );
-    end
-end
-mean_validate_acc = median( validate_acc, 1);
-[~, best_cost_idx] = max(mean_validate_acc);
-best_cost = costs(best_cost_idx);
-
-for j = 1:nsets
-    
-    whtrain = whtrain_sets{ j };
-    whtest  = whtest_sets{ j };
-    
-    %% Train model using LIBLINEAR's logistic regression model
-    Y_train = Y( whtrain );
-    X_train = sparse( X( whtrain , : ));
-    
-    Y_test = Y( whtest );
-    X_test = sparse( X( whtest , : ));
-    
-    options = sprintf( '-q -s %d -c %3.20f' , classifiertype , best_cost );
-    model = train( Y_train , X_train, options );
-    models{ j } = model;
-    % Test model using code from LIBLINEAR
-    warning off;
-    test_options = '-b 1 -q'; % -b 1 outputs probability estimates
-    [predict_label_train, accuracy_train, dec_values_train] = predict( Y_train, X_train, model , test_options );
-    [predict_label_test, accuracy_test, dec_values_test] = predict( Y_test, X_test, model , test_options );
-    warning on;
-    
-    Y_pred_cell{j} = predict_label_test;
-    YP_pred_cell{ j } = dec_values_test;
-    
-    %fprintf( '\tSet %2d  Acctrain=%3.2f AccTest=%3.2f pnz=%3.2f w2=%8.8f\n' , j , accuracy_train( 1 ) , accuracy_test( 1 ) , mean( model.w(:) ~= 0 ) , mean( model.w(:) .^ 2 ) );
-    
-end
-
-%% Combine predictions from folds
-if pt == 1 | pt == 3
-    YTRUE   = Y;
-    Y_pred  = zeros( NY , 1 ); % store the hard classification
-    YP_pred = zeros( NY , 1 ); % store the probability of true answer
-    for j=1:nsets-1
-        whtest  = find(whtest_sets{ j });
-        Y_pred( whtest ) = Y_pred_cell{j};
-        ntest = length( whtest );
-        for i=1:ntest
-            whtrue = Y( whtest(i) );
-            YP_pred( whtest(i) ) = YP_pred_cell{ j }( i , whtrue );
-        end
-    end
-elseif pt==5
-    YTRUE   = Y;
-    Y_pred  = zeros( NY , 1 ); % store the hard classification
-    YP_pred = zeros( NY , 1 ); % store the probability of true answer
-    for j=1:nsets-1
-        whtest  = whtest_sets{ j };
-        Y_pred( whtest ) = Y_pred_cell{j};
-        ntest = length( whtest );
-        for i=1:ntest
-            whtrue = Y( whtest(i) );
-            YP_pred( whtest(i) ) = YP_pred_cell{ j }( i , whtrue );
-        end
-    end
-else
-    whtest = whtest_sets{ 1 };
-    YTRUE  = Y( whtest );
-    Y_pred = Y_pred_cell{ 1 };
-    YP_pred = zeros( size( Y_pred ));
-    ntest = length( whtest );
-    for i=1:ntest
-        whtrue = YTRUE( i );
-        YP_pred( i ) = YP_pred_cell{ 1 }( i , whtrue );
+        options = sprintf( '-q -s %d -c %3.20f' , classifiertype , cost );
+        model = train( Y_train , X_train, options );
+        models{ j } = model;
+        
+        % Test model using code from LIBLINEAR
+        warning off;
+        test_options = '-b 0 -q'; % -b 1 outputs probability estimates
+        [predict_label_train, accuracy_train, dec_values_train] = predict( Y_train, X_train, model , test_options );
+        [predict_label_test, accuracy_test, dec_values_test] = predict( Y_test, X_test, model , test_options );
+        
+        % accuracy is [accuracy, MSE, squared correlation coefficient] 
+        warning on;
+        
+        acc(j,c) = accuracy_test(1); 
+        nonzeros{j,c} = sum(model.w~=0,2); 
+        
+        
     end
 end
 
-if (pt == 1)||(pt == 3)
-    % we only have predictions for 19 subjects
-    fprintf( '\tAccuracy=%3.2f\n' , mean(Y_pred(Y_pred~=0) == YTRUE(Y_pred ~=0))* 100);
-else
-    fprintf( '\tAccuracy=%3.2f\n' , mean( Y_pred == YTRUE ) * 100);
-end
+% Save info 
+filenm = [ rd filesep 'feature_selection' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_valid' ,...
+    pt , whs , classifiertype , whrep ) ];
 
-% And save the resulting model trained on all of session 1 data
-filenm = [ rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_truncate%d_valid' ,...
-    pt , whs , classifiertype , whrep, truncate ) ];
-
-modelnow = models{ nsets };
 if dosave
-    save( filenm , 'modelnow' , 'pt' , 'whs' , 'classifiertype' , 'whrep' ,...
-        'featurelabels' , 'YTRUE' , 'Y_pred', 'best_cost', 'validate_acc');
-end
-
-% Save the average data (non-discriminative)
-
-filenm = [rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_truncate%d_valid' ,...
-    pt + 100 , whs , classifiertype , whrep ) ];
-
-modelnow = models{ nsets };
-maxy = max( Y );
-modelnow.w = zeros( maxy , NF );
-% Convert to z-scores
-Z = X;
-Z = Z -  repmat( mean( Z , 1 ) , NY ,1 );
-Z = Z ./ repmat( std( Z , [] , 1 ) , NY ,1 );
-for i=1:maxy
-    wh = find( Y == i );
-    modelnow.w( i , : ) = mean( Z( wh , : ) , 1 );
-end
-if dosave
-    save( filenm , 'modelnow' , 'pt' , 'whs' , 'classifiertype' , ...
-        'whrep' , 'featurelabels', 'best_cost');
+    save( filenm , 'acc' , 'nonzeros', 'pt' , 'whs' , 'classifiertype' , 'whrep' ,...
+        'featurelabels');
 end
 
 end
