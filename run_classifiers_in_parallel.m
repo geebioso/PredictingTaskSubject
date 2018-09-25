@@ -3,7 +3,7 @@ whsets = [-1:3];
 whreps = [1:10];
 whpts = 1:2;
 isHPC = 0;
-truncate = 0; 
+truncate = 1; 
 Nworkers = min( 4, feature('numCores')); 
 
 %% Start parallel pool

@@ -2,7 +2,7 @@
 % set using the plot_mode variable
 
 %% Options
-plot_mode = "feature_selection"; % feature_selection, data_exploration, task_classification, subject_classification, processing_robustness
+plot_mode = "processing_robustness"; % feature_selection, data_exploration, task_classification, subject_classification, processing_robustness
 truncate = 0;
 isHPC = 0;
 

@@ -407,7 +407,7 @@ end
 % Save the average data (non-discriminative)
 
 filenm = [rd filesep 'discrweights' filesep sprintf( 'pt%d_whs%d_c%d_whr%d_truncate%d_valid' ,...
-    pt + 100 , whs , classifiertype , whrep ) ];
+    pt + 100 , whs , classifiertype , whrep, truncate ) ];
 
 modelnow = models{ nsets };
 maxy = max( Y );
