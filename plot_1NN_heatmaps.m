@@ -1,4 +1,4 @@
-function [] = plot_1NN_heatmaps( isHPC, whs )
+function [] = plot_1NN_heatmaps( isHPC, whs, truncate )
 %% Subject Classification Plots
 
 [wd, rd] = set_directories(isHPC); % working directory and results directory
@@ -7,7 +7,6 @@ function [] = plot_1NN_heatmaps( isHPC, whs )
 classifiertype = 8;
 FC_and_FV = 1;
 subj_plot = 1;
-truncate = 1; 
 
 %% Load the original ROI timecourse data
 

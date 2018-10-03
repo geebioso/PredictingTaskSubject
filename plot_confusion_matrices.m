@@ -162,8 +162,8 @@ end
 %     c{i}.Face.ColorBinding = 'discrete'; 
 % end
 
-filename = fullfile(rd, 'images', sprintf('confusion_matrices_pt%d_whs%d_c%d_whr%d_whr%d', ...
-    pt , whs , classifiertype , whreps(1), whreps(2) ));
+filename = fullfile(rd, 'images', sprintf('confusion_matrices_pt%d_whs%d_c%d_whr%d_whr%d_truncate%d', ...
+    pt , whs , classifiertype , whreps(1), whreps(2), truncate ));
 if usepatchimg
     print(filename, '-depsc');
 else
@@ -171,3 +171,6 @@ else
     
     print(filename, '-depsc', '-r0'); 
 end
+
+%% Compute correlation of non-diagonal errors 
+

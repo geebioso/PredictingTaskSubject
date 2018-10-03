@@ -1,15 +1,14 @@
-function [] = finn_et_al_analysis(isHPC, whs, truncate) 
+function [] = finn_et_al_analysis(isHPC, whsets, truncate) 
 classifiertype = 8;
 print_dataset = 1; 
 
 [wd, rd] = set_directories(isHPC); % working directory and results directory
 
-whsets = [-1:3]; 
 whreps = [1,4, 7:9]; % 10]; % [1,2,4,9,10]
 whreps_labels = { 'BVSD', 'BVM', 'BVVS', 'BVV', 'MSSD', 'SQRT_MSSD', 'FCP', 'FCC', 'FCCV', 'FCCS'};
 whreps_type = {'BV', 'BV', 'BV', 'BV', 'BV', 'BV', 'FC', 'FC', 'FC', 'FC' };
 
-load(fullfile(rd, 'features', sprintf('whs%d_truncate%d.mat', whs, truncate)), 'NR');
+load(fullfile(rd, 'features', sprintf('whs%d_truncate%d.mat', whsets(1), truncate)), 'NR');
 load( fullfile(rd, 'ICAresults','tasklist') );
 NT = length(tasks); 
 
@@ -39,14 +38,21 @@ p = 0.95;
 dopredtasks = [3,4];
 
 % load cost info
-latex_filename = fullfile(rd, 'Results', 'finn_et_al_table.txt');
+latex_filename = fullfile(rd, 'Results', sprintf('finn_et_al_latex_table_truncate%d.txt', truncate));
+tab_filename = fullfile(rd, 'Results', sprintf('finn_et_al_table_truncate%d.txt', truncate));
 
-f = fopen(latex_filename, 'w');
+f  = fopen(latex_filename, 'w');
+f2 = fopen(tab_filename, 'w');
 
 % Print Headers
 fprintf(f, '\\begin{tabular}{ l l l l l l l l } \n \\hline \\\\[-1ex] ');
-fprintf(f, '{\\bf Type} & {\\bf Method}  & {\\bf \\# Feat} & {\\bf Within } & \\multicolumn{4}{c}{\\bf Between } \\\\ \\\\[-2ex] \\cline{5-8}\n');
-fprintf(f, ' & & & & {\\bf All} & {\\bf Same Task} & {\\bf Diff Task} & {\\bf Rest} \\\\ \\\\[-2ex] \n');
+fprintf(f, '{\\bf Method}  & {\\bf \\# Feat} & {\\bf Within } & \\multicolumn{4}{c}{\\bf Between } \\\\ \\\\[-2ex] \\cline{5-8}\n');
+fprintf(f, ' & & & {\\bf All} & {\\bf Same Task} & {\\bf Diff Task} & {\\bf Rest} \\\\ \\\\[-2ex] \n');
+
+% fprintf(f2, 'Method\tFeat\tWithin\t \t \t \t \n'); 
+% fprintf(f2, '\t \t \t All\tSame Task\tDiff Task\tRest\n'); 
+
+fprintf(f2, 'Method\tFeat\tWithin\tAll\tSame Task\tDiff Task\tRest\n'); 
 
 % Print Body
 for whs = whsets
@@ -55,11 +61,13 @@ for whs = whsets
         data_set_idx = find([datasetnames{:,2}]== whs); 
         fprintf(f, '\n \\multicolumn{8}{l}{Dataset %d: %s }\\\\ \\cline{1-7} \\\\ \\\\[-2ex] \n',...
             whs, strrep( datasetnames{data_set_idx, 1}, '_', '\_'));
+        fprintf(f2, 'Dataset %d\t \t \t \t \t \t \n', whs); 
     end
     
     for i = 1:length(whreps)
         whrep = whreps(i);
-        fprintf(f, '%s & %s & %s ', whreps_type{i}, strrep(whreps_labels{whrep}, '_', ' '), whrep_feat_no{i});
+        fprintf(f, '%s & %s ',  strrep(whreps_labels{whrep}, '_', ' '), whrep_feat_no{i});
+        fprintf(f2, '\t%s\t%s', strrep(whreps_labels{whrep}, '_', ' '), whrep_feat_no{i});
         
         accuracies = zeros(5,1);
         creds = zeros(5,2); 
@@ -138,6 +146,12 @@ for whs = whsets
                     acc_mean.t2dt, acc_cred.t2dt(1), acc_cred.t2dt(2), ...
                     acc_mean.r2r, acc_cred.r2r(1), acc_cred.r2r(2) );
                 
+                 fprintf(f2, '\t%3.0f (%d, %d)\t%3.0f (%d, %d)\t%3.0f (%d, %d)\t%3.0f (%d, %d)', ...
+                    accuracy, round(cred(1)), round(cred(2)), ...
+                    acc_mean.t2st, acc_cred.t2st(1), acc_cred.t2st(2), ...
+                    acc_mean.t2dt, acc_cred.t2dt(1), acc_cred.t2dt(2), ...
+                    acc_mean.r2r, acc_cred.r2r(1), acc_cred.r2r(2) );
+                
                 accuracies(3) = acc_mean.t2st; 
                 accuracies(4) = acc_mean.t2dt; 
                 accuracies(5) = acc_mean.r2r; 
@@ -148,6 +162,8 @@ for whs = whsets
             else
                 fprintf(f, ' & %3.0f (%d, %d)', ...
                     accuracy, round(cred(1)), round(cred(2)));
+                fprintf(f2, '\t%3.0f (%d, %d)', ...
+                    accuracy, round(cred(1)), round(cred(2)));
             end
        
         end
@@ -157,6 +173,7 @@ for whs = whsets
         CORRECT.(sprintf('whs%s', genvarname(num2str(whs)))).(whreps_labels{whrep}) = correct;
         
         fprintf(f, ' \\\\ \n ');
+        fprintf(f2, '\n');
     end
     
 end

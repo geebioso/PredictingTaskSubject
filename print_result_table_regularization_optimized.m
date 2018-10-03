@@ -28,7 +28,7 @@ costs = [ 1e-10 1e-9 1e-8 1e-7 1e-6 0.00001, 0.0001, 0.001, 0.01, .1, 1, 10, 100
 print_dataset = 1;
 
 latex_filename = fullfile(getenv('HOME'), 'Dropbox', 'anatomical', 'Results',...
-    'LR_all_latex_table_regularization_optimized_HCP.txt');
+    sprintf('LR_all_latex_table_regularization_optimized_HCP_truncate%d.txt', truncate));
 
 [ datasetnames] = load_dataset_names();
 

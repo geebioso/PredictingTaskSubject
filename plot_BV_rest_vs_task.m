@@ -38,3 +38,6 @@ filename = fullfile( rd, 'images', sprintf('avg_rest_std_dev_vs_ave_task_std_dev
 print(filename, '-depsc');
 
 
+%% do some stats 
+
+

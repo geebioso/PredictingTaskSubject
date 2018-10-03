@@ -2,7 +2,7 @@
 % set using the plot_mode variable
 
 %% Options
-plot_mode = "processing_robustness"; % feature_selection, data_exploration, task_classification, subject_classification, processing_robustness
+plot_mode = "task_classification"; % feature_selection, data_exploration, task_classification, subject_classification, processing_robustness
 truncate = 0;
 isHPC = 0;
 
@@ -28,6 +28,7 @@ whreps = [1,7];
 % whrep==9: FCCV
 % whrep==10: FCCS
 
+fprintf('Plotting for %s\n\n', plot_mode); 
 if strcmp( plot_mode, 'feature_selection')
     
     % options 
@@ -46,10 +47,10 @@ elseif strcmp( plot_mode, 'data_exploration')
     remove_max = 0;
     
     plot_BV_heatmap (whs, truncate, roi_sort_by, fontsize, labels_on, ...
-        normalize, grid_on, remove_max) 
+        normalize, grid_on, remove_max, isHPC) 
     
     fontsize = 18; 
-    plot_BV_rest_vs_task( whs, truncate, fontsize); 
+    plot_BV_rest_vs_task( isHPC, whs, truncate, fontsize); 
     
 elseif strcmp( plot_mode, 'task_classification')
 
@@ -65,9 +66,9 @@ elseif strcmp( plot_mode, 'task_classification')
     plot_confusion_matrices( isHPC, whreps, whs, truncate, classifiertype, ...
     fontsize, fontcolor, usepatchimg, include_zeros, zero_char, facealpha)
     
-elseif strcmp( plot_mode, 'subject_classifications')
+elseif strcmp( plot_mode, 'subject_classification')
     
-    plot_1NN_heatmaps( isHPC, whs )
+    plot_1NN_heatmaps( isHPC, whs, truncate )
     
 elseif strcmp( plot_mode, 'processing_robustness')
     

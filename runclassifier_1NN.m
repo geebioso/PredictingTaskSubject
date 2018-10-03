@@ -8,7 +8,7 @@
 % Feb 2 2017
 clear D;
 isHPC = 0;
-truncate = 1; 
+truncate = 0; 
 
 [wd, rd] = set_directories(isHPC); % working directory and results directory
 
@@ -24,30 +24,30 @@ dopredtasks    = 3:4;%[1:5];
 
 K                 = 5; % number of folds, use 5 so that stratified cross validation tests points from all 19 subjects
 
-dorepresents      = [1:10 ];% [ 1,2,4,9:12 ];
+dorepresents      = [1:10];% [ 1,2,4,9:12 ];
 
-% whrep==1: ROI StdDev
-% whrep==2: ROI means
-% whrep==3: ROI FV scaled
-% whrep==4: ROI FV
+% whrep==1: BVSD
+% whrep==2: M
+% whrep==3: BVVS
+% whrep==4: BVV
 % whrep==5: MSSD
 % whrep==6: SQRT MSSD
-% whrep==7: ROI FC correlation
-% whrep==8: ROI FC covariance
-% whrep==9: ROI FC covariance and variance
-% whrep==10: ROI FCcov scaled
+% whrep==7: FCP
+% whrep==8: FCC
+% whrep==9: FCCV
+% whrep==10: FCCS
 
 featurelabels = { ...
-    'StdDev ROIs' , ...
-    'Means  ROIs' , ...
-    'ROI FV scaled',...
-    'ROI FV',...
+    'BVSD' , ...
+    'M' , ...
+    'BVVS',...
+    'BV',...
     'MSSD', ...
-    'SQRT_MSS', ...
-    'Corrs  ROIs' , ...
-    'Covs   ROIS', ...
-    'Covs+Vars ROIs', ...
-    'Covs   ROIS scaled'
+    'SQRT_MSSD', ...
+    'FCP' , ...
+    'FCC', ...
+    'FCCV', ...
+    'FCCVS'
     };
 
 classifiertype=8;
@@ -170,7 +170,8 @@ for whs = whsets
             
             % session indices 
             sess1_idx = combs(:,3) == 1; 
-            sess2_idx = and( combs(:,3) == 2, ismember( combs( : , 1) , subsinbothsessions )); 
+            subj_both_sessions = ismember( combs( :, 1), subsinbothsessions); 
+            sess2_idx = and( combs(:,3) == 2, subj_both_sessions); 
             
             % Classification loop 
             for t1 = 1:NT
@@ -180,8 +181,12 @@ for whs = whsets
                     
                     %% Within 
                     % train/test indices 
-                    test_idx = and(sess1_idx, t1_idx);
+                    % only test on 19 subjects, compare to all 174 subjects
+                    % for training 
+%                     test_idx = and(sess1_idx, t1_idx);
+                    test_idx = and( and(sess1_idx, t1_idx), subj_both_sessions);
                     train_idx = and(sess1_idx, t2_idx);
+                    % train_idx = and( and(sess1_idx, t2_idx), subj_both_sessions); 
                     
                     % subject labels 
                     test_labels = combs(test_idx,1); 

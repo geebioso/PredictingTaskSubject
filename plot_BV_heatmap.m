@@ -1,6 +1,6 @@
 %% Script to plot a matrix of standard deviation in BOLD activation
 function [] = plot_BV_heatmap (whs, truncate, roi_sort_by, fontsize, labels_on, ...
-    normalize, grid_on, remove_max) 
+    normalize, grid_on, remove_max, isHPC) 
 
 %% INPUT: 
 %     str roi_sort_by: how to sort rois {'Lobe' or 'Hemishpere'}
@@ -281,7 +281,6 @@ if plot_ordered
     
 end
 %% Plot For only 19 subjects in both sessions
-
 if plot_19_subjs_subj
     
     bothsess = ismember(combs(:,1), subsinbothsessions);
@@ -392,11 +391,37 @@ if plot_19_subjs_subj
         roi_sort_by, normalize, whs, truncate));
     print(filename, '-depsc');
     
+    %% Subject statistical testing 
+    BV = features.stds_sess2(sort_idx,lobe_idx); 
+    subj_idx = repmat(1:NSboth, NT, 1);
+    subj_idx = subj_idx(:); 
+    
+    % manova1(BV, subj_idx)
+    
+    [coeff,score,latent,tsquared,explained,mu] = pca(BV); 
+    i = find( cumsum(explained) > 99.5); 
+    
+    t = score(:, 1:i(1))*coeff(:, 1:i(1))' + repmat(mu,length(subj_idx),1); 
+    [d,p,stats] = manova1(score(:,1:i(1)), subj_idx)
+    
+    %% Task Statistical Testing 
+    [sess2_subjs, sort_idx] = sort(combs(session2, 2));
+    taskBV = features.stds_sess2(sort_idx,lobe_idx); 
+    task_idx = repmat(1:NT, NSboth, 1);
+    task_idx = task_idx(:); 
+    
+    [coeff,score,latent,tsquared,explained,mu] = pca(taskBV); 
+    i = find( cumsum(explained) > 100); 
+    
+    t = score(:, 1:i(1))*coeff(:, 1:i(1))' + repmat(mu,length(task_idx),1); 
+    [d,p,stats] = manova1(score(:,1:i(1)), task_idx)
+    
+    idx = kmeans(taskBV,d)
+    
 end
 
 
-%% Plot For only 19 subjects in both sessions
-
+%% Plot For only 19 subjects in both sessions (TASK ordering) 
 if plot_19_subjs_task
     
     
