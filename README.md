@@ -21,7 +21,7 @@ These functions are called by `run_classifiers_in_parallel.m`
 
 ## Results 
 
-The main functions for result aggregation are: 
+The main functions for result aggregation and plotting are : 
 
 `finn_et_al_analysis.m`: performs the analyses in Finn et al. 2015    
 `finn_plot_all_accuracies.m`: produces bar plots comparing accuracies for each preprocessing variation     
