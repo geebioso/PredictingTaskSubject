@@ -6,7 +6,8 @@ This repository provides code for the analyses used in the manuscript: Predictin
 The main functions for preprocessing the data and computing features are: 
 
 `preprocessROIdata_v1.m`: formats the time course for further analysis and calls `preparedatastruct2.m`    
-`compute_features.m`: computes and saves machine learning features     
+`compute_features.m`: computes and saves machine learning features so that we 
+don't have to recompute features every modeling run     
 
 
 ## Analysis 
@@ -24,10 +25,12 @@ The main functions for result aggregation are:
 
 `finn_et_al_analysis.m`: performs the analyses in Finn et al. 2015    
 `finn_plot_all_accuracies.m`: produces bar plots comparing accuracies for each preprocessing variation     
-`plot_1NN_heatmaps.m`: plots the Finn et al. 2015 heatmap comparison     
+`plot_all.m`: generates plots based on the type of analysis ran (task classification, 
+subject classification, data exploration, preprocessing robustness) 
+<!-- `plot_1NN_heatmaps.m`: plots the Finn et al. 2015 heatmap comparison     
 `plot_FV_heatmap.m`: visualizes the raw BOLD variability features     
 `print_result_table_regularization_optimized`: prints out the logistic regression accuracies    
 `plot_accuracies_all_datasets.m`: plots the logistic regression accuracies for each preprocessing variation      
-
+-->
 
 
