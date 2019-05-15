@@ -1,9 +1,10 @@
 
 whsets = [-1:3];
-whreps = [1:10];
-whpts = 1:2;
+whreps = [4];
+whpts = 3:4;
 isHPC = 0;
 truncate = 1; 
+motion_correct = 1; 
 Nworkers = min( 4, feature('numCores')); 
 
 %% Start parallel pool
@@ -34,7 +35,7 @@ parfor p = 1:size(allpairs,1)
     whs = allpairs(p,1);
     whrep = allpairs(p,2);
     pt = allpairs(p,3); 
-    runclassifier_fully_parallelized(isHPC, whs, whrep, pt, truncate);
+    runclassifier_fully_parallelized(isHPC, whs, whrep, pt, truncate, motion_correct);
 end
 
 

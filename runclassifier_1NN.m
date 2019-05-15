@@ -8,7 +8,8 @@
 % Feb 2 2017
 clear D;
 isHPC = 0;
-truncate = 0; 
+truncate = 1; 
+motion_correct = 1; 
 
 [wd, rd] = set_directories(isHPC); % working directory and results directory
 
@@ -24,7 +25,7 @@ dopredtasks    = 3:4;%[1:5];
 
 K                 = 5; % number of folds, use 5 so that stratified cross validation tests points from all 19 subjects
 
-dorepresents      = [1:10];% [ 1,2,4,9:12 ];
+dorepresents      = [1:11];% [ 1,2,4,9:12 ];
 
 % whrep==1: BVSD
 % whrep==2: M
@@ -47,7 +48,8 @@ featurelabels = { ...
     'FCP' , ...
     'FCC', ...
     'FCCV', ...
-    'FCCVS'
+    'FCCVS', ...
+    'BVMAD'
     };
 
 classifiertype=8;

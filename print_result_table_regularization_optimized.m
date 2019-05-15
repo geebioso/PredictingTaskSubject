@@ -8,9 +8,9 @@ else
     error( 'DO NOT USE classifiertype=8. DEPRECATED. USE finn_et_al_analysis.m INSTEAD');
 end
 
-whreps = [1,4, 7:9]; % 10]; % [1,2,4,9,10]
-whreps_labels = { 'BVSD', 'BVM', 'BVVS', 'BVV', 'MSSD', 'SQRT_MSSD', 'FCP', 'FCC', 'FCCV', 'FCCS'};
-whreps_type = {'BV', 'BV', 'BV', 'BV', 'BV', 'BV', 'FC', 'FC', 'FC', 'FC' };
+whreps = [1,4, 7:9, 11]; % 10]; % [1,2,4,9,10]
+whreps_labels = { 'BVSD', 'BVM', 'BVVS', 'BVV', 'MSSD', 'SQRT_MSSD', 'FCP', 'FCC', 'FCCV', 'FCCS', 'BVMAD'};
+whreps_type = {'BV', 'BV', 'BV', 'BV', 'BV', 'BV', 'FC', 'FC', 'FC', 'FC', 'BV' };
 
 % whrep==1: ROI StdDev
 % whrep==2: ROI means
@@ -91,10 +91,10 @@ for whs = whsets
     % set feature set dimensions
     if size(modelnow.w, 2) == 269
         whrep_feat_no = {'269', '269', '269', '269', '269', '269', '$\frac{269*268}{2}$',...
-            '$\frac{269*268}{2}$', '$\frac{269*269}{2}$', '$\frac{269*268}{2}$', };
+            '$\frac{269*268}{2}$', '$\frac{269*269}{2}$', '$\frac{269*268}{2}$', '269'};
     elseif size(modelnow.w, 2) == 305
         whrep_feat_no = {'305', '305', '305', '305', '305', '305', '$\frac{305*304}{2}$',...
-            '$\frac{305*304}{2}$', '$\frac{305*305}{2}$', '$\frac{305*304}{2}$', };
+            '$\frac{305*304}{2}$', '$\frac{305*305}{2}$', '$\frac{305*304}{2}$', '305'};
     end
     
     

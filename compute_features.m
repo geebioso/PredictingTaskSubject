@@ -181,6 +181,7 @@ for whs = whsets
     roi_means = zeros( NC , NR  );
     roi_stds  = zeros( NC , NR  );
     mssd  = zeros( NC , NR  );
+    mad  = zeros( NC , NR  );
     
     warning off;
     triidx = ~triu(true(NR));
@@ -206,6 +207,8 @@ for whs = whsets
         roi_means( j , : ) = mean( ROI_NOW , 1 );
         roi_stds( j , : )   = std( ROI_NOW , [] , 1 );
         mssd( j, : ) = compute_mssd(ROI_NOW);
+        mad( j, : ) = compute_mad( ROI_NOW); 
+        
         
         rhos  = 1 - pdist( ROI_NOW' , 'correlation' );
         rhos2 = cov(ROI_NOW);
@@ -233,6 +236,7 @@ for whs = whsets
     features.means = single(roi_means);
     features.stds = single(roi_stds);
     features.mssd = single(mssd);
+    features.mad = single(mad); 
     
     filenm = fullfile( rd, 'features', sprintf( 'whs%d_truncate%d.mat', whs, truncate));
     fprintf('Saving %s\n', filenm); 

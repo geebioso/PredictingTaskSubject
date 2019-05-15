@@ -1,4 +1,4 @@
-function [] = runclassifier_fully_parallelized(isHPC, whs, whrep, pt, truncate)
+function [] = runclassifier_fully_parallelized(isHPC, whs, whrep, pt, truncate, motion_correct)
 
 % INPUT
 %   logical isHPC: are we running this function on the UCI high performance cluster? 
@@ -24,6 +24,7 @@ function [] = runclassifier_fully_parallelized(isHPC, whs, whrep, pt, truncate)
 % whrep==8: FCC
 % whrep==9: FCCV
 % whrep==10: FCCS
+% whrep==11: MAD 
 
 % pt == 1, Predict Task Session 1 (target group)
 % pt == 2, Predict Task Session 2 (target group)
@@ -38,7 +39,7 @@ if ~isa(isHPC, 'numeric')
     pt = str2num(pt); 
 end
 
-fprintf('isHPC=%d, whs=%d, whrep=%d, pt=%d, truncate=%d\n', isHPC, whs, whrep, pt, truncate);
+fprintf('isHPC=%d, whs=%d, whrep=%d, pt=%d, truncate=%d, motion_correct=%d\n', isHPC, whs, whrep, pt, truncate, motion_correct);
 
 %% Options
 
@@ -89,7 +90,8 @@ featurelabels = { ...
     'FCP' , ...
     'FCC', ...
     'FCCV', ...
-    'FCCVS'
+    'FCCVS', ...
+    'MAD'
     };
 
 rng( seed );
@@ -126,6 +128,39 @@ roi_vars_scale = features.stds.^2;
 features.vars_scale = (roi_vars_scale - mean(roi_vars_scale(:)))/std(roi_vars_scale(:));
 features.covs_scale = (features.covs - mean(features.covs(:)))/(std(features.covs(:)));
 clear roi_vars_scale
+
+% Calculate motion 
+if motion_correct 
+   fprintf('Regressing BV and FC on mean frame displacement\n'); 
+   
+   % load mean frame displacement 
+   S1_motion_filename = fullfile( '..', '..','FMRI', 'restingstatedata', 'meanFD_174Subj.mat'); 
+   S1MFD = load(S1_motion_filename) ;
+   
+   S2_motion_filename = fullfile( '..', '..','FMRI', 'restingstatedata', 'batch2_meanFD.mat'); 
+   S2MFD = load(S2_motion_filename) ;
+   
+  % create stacked mean frame displacement 
+   mfd = zeros(size(combs,1), 1);
+   for sess = 1:2
+       sess_idx = combs(:,3) == sess;
+       subj_id = combs( :, 1);
+       task_id = combs(:, 2);
+       unique_subjs = unique(subj_id(sess_idx)); 
+       for s = 1:length( unique_subjs) 
+           for t = 1:NT
+               idx = and( and( subj_id == unique_subjs(s), task_id == t), sess_idx);
+               if sess == 1
+                    mfd( idx ) = S1MFD.meanFD(s,t);
+               elseif sess == 2
+                    mfd( idx ) = S2MFD.meanFD(s,t);
+               end
+           end
+       end
+   end
+   
+   combs(:,4) = mfd; 
+end
 
 %% Classification loop
 fprintf( '**************************************************************\n' );
@@ -281,9 +316,21 @@ if whrep==10
     X = features.covs_scale(whok,:);
 end
 
+if whrep==11
+    X = features.mad(whok,:);
+end
+
 X = double(X);
+
 % number of features
 NF = size( X , 2 );
+
+
+%% Regress out Mean Frame Displacement
+if motion_correct 
+   mfd = combs(whok,4); 
+   X = bsxfun(@minus, X, mean(X)); % this is the same as regressing out the mean frame displacement for BV for a single task and subject 
+end
 
 %% Parallel loop
 Y_pred_cell = cell( nsets , 1 );
